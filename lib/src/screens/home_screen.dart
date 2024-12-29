@@ -1,6 +1,8 @@
+import 'package:call_app_livekit/src/providers/live_kit_provider.dart';
 import 'package:call_app_livekit/src/screens/call_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final liveKitController = Provider.of<LiveKitController>(context);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -61,16 +64,25 @@ class _HomeScreenState extends State<HomeScreen> {
               style: ButtonStyle(
                 backgroundColor: WidgetStateProperty.all(Colors.blue),
               ),
-              onPressed: () {
-                context.push(CallScreen.routeName, extra: {
-                  "callId": _callIdController.text,
-                  "username": _usernameController.text,
-                  "peerId": _peerIdController.text,
-                });
+              onPressed: () async {
+                String token = await liveKitController.getConnectionToken(
+                    username: _usernameController.text,
+                    meetId: _callIdController.text,
+                    userId: _peerIdController.text);
+                await liveKitController.connectToRoom(token);
+                if (liveKitController.isConnected) {
+                  context.push(CallScreen.routeName, extra: {
+                    "callId": _callIdController.text,
+                    "username": _usernameController.text,
+                    "peerId": _peerIdController.text,
+                    "room": liveKitController.room,
+                    "listener": liveKitController.listener,
+                  });
+                }
               },
-              child: const Text(
-                'Join Call',
-                style: TextStyle(color: Colors.white),
+              child: Text(
+                liveKitController.isJoining ? "Joining" : 'Join Call',
+                style: const TextStyle(color: Colors.white),
               ),
             )
           ],
