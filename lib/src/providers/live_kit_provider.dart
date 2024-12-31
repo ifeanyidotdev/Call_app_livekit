@@ -41,7 +41,9 @@ class LiveKitController extends ChangeNotifier {
   bool _isCameraEnabled = true;
   bool _isScreenSharing = false;
   bool _isJoining = false;
+  bool _isError = false;
   bool _isRecording = false;
+  String _errorMessage = "";
   late EventsListener<RoomEvent> _listener;
 
   bool get isConnected => _isConnected;
@@ -49,6 +51,9 @@ class LiveKitController extends ChangeNotifier {
   bool get isCameraEnabled => _isCameraEnabled;
   bool get isJoining => _isJoining;
   bool get isRecording => _isRecording;
+  bool get isError => _isError;
+  bool get isScreenSharing => _isScreenSharing;
+  String get errorMessage => _errorMessage;
   Room get room => _room;
   EventsListener<RoomEvent> get listener => _listener;
 
@@ -57,13 +62,14 @@ class LiveKitController extends ChangeNotifier {
       required String meetId,
       required String userId}) async {
     _isJoining = true;
+    _isError = false;
     notifyListeners();
     try {
       final dio = Dio(BaseOptions(baseUrl: "https://local.cloudnotte.com/api"));
       final response = await dio.post("/liveClass/joinCall", data: {
         "username": username,
         "userIdentity": userId,
-        "callIdentity": meetId
+        "callId": meetId
       });
       final data = response.data;
       print("DATA ${data.toString()}");
@@ -79,18 +85,24 @@ class LiveKitController extends ChangeNotifier {
   Future<void> connectToRoom(String token) async {
     try {
       _isJoining = true;
+      _isConnected = false;
       notifyListeners();
       _listener = room.createListener();
       await _room.prepareConnection(
-          "wss://cloudnotte-xbiutpjq.livekit.cloud", token);
+        "wss://cloudnotte-xbiutpjq.livekit.cloud",
+        token,
+      );
       await _room.connect("wss://cloudnotte-xbiutpjq.livekit.cloud", token);
       await _room.localParticipant?.setCameraEnabled(_isCameraEnabled);
       await _room.localParticipant?.setMicrophoneEnabled(_isMicEnabled);
       _isConnected = true;
-      _room.addListener(_onRoomEvent);
       _isJoining = false;
       notifyListeners();
     } catch (e) {
+      _isJoining = false;
+      _isError = true;
+      _errorMessage = e.toString();
+      notifyListeners();
       print('Error connecting to room: $e');
     }
   }

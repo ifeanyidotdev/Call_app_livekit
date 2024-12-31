@@ -44,19 +44,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 hintText: 'Enter Call Id',
               ),
             ),
-            const SizedBox(
-              height: 10,
-            ),
-            const SizedBox(
-              height: 10,
-            ),
-            TextField(
-              controller: _peerIdController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Enter peer Id',
-              ),
-            ),
+
+            // const SizedBox(
+            //   height: 10,
+            // ),
+            // TextField(
+            //   controller: _peerIdController,
+            //   decoration: const InputDecoration(
+            //     border: OutlineInputBorder(),
+            //     hintText: 'Enter peer Id',
+            //   ),
+            // ),
             const SizedBox(
               height: 10,
             ),
@@ -78,6 +76,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     "room": liveKitController.room,
                     "listener": liveKitController.listener,
                   });
+                }
+                if (liveKitController.isError) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(liveKitController.errorMessage),
+                    ),
+                  );
                 }
               },
               child: Text(

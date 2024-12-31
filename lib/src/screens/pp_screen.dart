@@ -51,10 +51,10 @@ class _PpScreenState extends State<PpScreen> {
                 backgroundColor: WidgetStateProperty.all(Colors.blue),
               ),
               onPressed: () {
-                context.push(CallScreen.routeName, extra: {
-                  "callId": _callIdController.text,
-                  "peerId": _peerIdController.text,
-                });
+                // context.push(CallScreen.routeName, extra: {
+                //   "callId": _callIdController.text,
+                //   "peerId": _peerIdController.text,
+                // });
               },
               child: const Text(
                 'Join Call',

@@ -1,8 +1,6 @@
 import 'dart:convert';
-import 'dart:ffi';
 
 import 'package:call_app_livekit/src/providers/live_kit_provider.dart';
-import 'package:call_app_livekit/src/services/web_rtc_service.dart';
 import 'package:call_app_livekit/src/widgets/no_video.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -35,6 +33,8 @@ class _CallScreenState extends State<CallScreen> {
   EventsListener<RoomEvent> get _listener => widget.listener;
   bool get fastConnection => widget.room.engine.fastConnectOptions != null;
   List<Participant> participants = [];
+  List<Participant> teachers = [];
+  Track? screenShareTrack;
 
   @override
   void initState() {
@@ -43,12 +43,6 @@ class _CallScreenState extends State<CallScreen> {
     widget.room.addListener(_onRoomDidUpdate);
     _setUpListeners();
     // _initializeRenderer();
-  }
-
-  void _updateUI() {
-    if (mounted) {
-      setState(() {});
-    }
   }
 
   void _sortParticipants() {
@@ -91,7 +85,16 @@ class _CallScreenState extends State<CallScreen> {
         participants.add(localParticipant);
       }
     }
+    List<Participant> teachers = [];
+
+    for (final p in participants) {
+      if (p.metadata == "teacher") {
+        teachers.add(p);
+      }
+    }
+    // participants.removeWhere((p) => p.metadata == "teacher");
     setState(() {
+      // this.teachers = teachers;
       this.participants = participants;
     });
   }
@@ -123,10 +126,10 @@ class _CallScreenState extends State<CallScreen> {
     ..on<LocalTrackSubscribedEvent>((event) {
       print('Local track subscribed: ${event.trackSid}');
     })
-    // ..on<LocalTrackPublishedEvent>((_) => _sortParticipants())
-    // ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants())
-    // ..on<TrackSubscribedEvent>((_) => _sortParticipants())
-    // ..on<TrackUnsubscribedEvent>((_) => _sortParticipants())
+    ..on<LocalTrackPublishedEvent>((_) => _sortParticipants())
+    ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants())
+    ..on<TrackSubscribedEvent>((_) => _sortParticipants())
+    ..on<TrackUnsubscribedEvent>((_) => _sortParticipants())
     // ..on<TrackE2EEStateEvent>()
     ..on<ParticipantNameUpdatedEvent>((event) {
       print(
@@ -161,6 +164,9 @@ class _CallScreenState extends State<CallScreen> {
 
   void _onRoomDidUpdate() {
     _sortParticipants();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -168,118 +174,178 @@ class _CallScreenState extends State<CallScreen> {
     final liveKitController = Provider.of<LiveKitController>(context);
 
     return Scaffold(
-        appBar: AppBar(
-          title: const Text('Meet'),
-          centerTitle: true,
-        ),
-        body: Column(
-          children: [
+      appBar: AppBar(
+        title: const Text('Meet'),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          if (liveKitController.isScreenSharing) ...[
             Expanded(
-              flex: 3,
-              child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: participants.length == 2
-                      ? 0
-                      : 2, // Adjust for larger grids
-                  crossAxisSpacing: 7,
-                  mainAxisSpacing: 7,
-                ),
-                itemCount: participants.length,
-                itemBuilder: (context, index) {
-                  final participant = participants[index];
-                  final videoTrack =
-                      participant.videoTrackPublications.isNotEmpty
-                          ? participant.videoTrackPublications.first.track
-                          : null;
-                  return SizedBox(
-                    width: 300,
-                    height: 300,
-                    child: Card(
-                      color: Colors.black12,
-                      child: Stack(
+              flex: 7,
+              child: Card(
+                color: Colors.black12,
+                child: Stack(
+                  children: [
+                    const SizedBox(
+                      height: 140,
+                    ),
+                    Expanded(
+                      child: screenShareTrack != null
+                          ? screenShareTrack?.muted == true
+                              ? const NoVideoWidget()
+                              : VideoTrackRenderer(
+                                  teachers.first.videoTrackPublications.first
+                                      .track as VideoTrack,
+                                  fit: RTCVideoViewObjectFit
+                                      .RTCVideoViewObjectFitCover,
+                                )
+                          : const NoVideoWidget(),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(
-                            flex: 1,
-                            child: videoTrack != null
-                                ? SizedBox(
-                                    width: 250,
-                                    height: 300,
-                                    child: VideoTrackRenderer(
-                                      videoTrack as VideoTrack,
-                                      fit: RTCVideoViewObjectFit
-                                          .RTCVideoViewObjectFitCover,
-                                    ),
-                                  )
-                                : const NoVideoWidget(),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  participant.name,
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                                Icon(
-                                  participant.isSpeaking
-                                      ? Icons.volume_up
-                                      : Icons.volume_off,
-                                  color: participant.isSpeaking
-                                      ? Colors.green
-                                      : Colors.grey,
-                                ),
-                              ],
-                            ),
+                          Text(
+                            teachers.first.name,
+                            style: const TextStyle(color: Colors.white),
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: Icon(liveKitController.isMicEnabled
-                      ? Icons.mic
-                      : Icons.mic_off),
-                  onPressed: liveKitController.toggleMic,
-                ),
-                IconButton(
-                  icon: Icon(liveKitController.isCameraEnabled
-                      ? Icons.videocam
-                      : Icons.videocam_off),
-                  onPressed: liveKitController.toggleCamera,
-                ),
-                IconButton(
-                  icon: Icon(Icons.screen_share),
-                  onPressed: liveKitController.startScreenShare,
-                ),
-                IconButton(
-                  icon: Icon(Icons.call_end_outlined),
-                  onPressed: () async {
-                    liveKitController.disconnect();
-                    if (!liveKitController.isConnected) {
-                      context.pop();
-                    }
-                  },
-                  color: Colors.red,
-                ),
-              ],
-            ),
           ],
-        )
-        // : Center(
-        //     child: ElevatedButton(
-        //       onPressed: () async {
-        //         await liveKitController.connectToRoom("", "");
-        //       },
-        //       child: Text('Join Room'),
-        //     ),
-        //   ),
-        );
+          Expanded(
+            flex: 3,
+            child: GridView.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount:
+                    participants.length == 2 ? 1 : 2, // Adjust for larger grids
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 5,
+              ),
+              itemCount: participants.length,
+              itemBuilder: (context, index) {
+                final participant = participants[index];
+                // final videoTrack = participant.videoTrackPublications.isNotEmpty
+                //     ? participant.videoTrackPublications.first.track?.muted ==
+                //             true
+                //         ? null
+                //         : participant.videoTrackPublications.first.track
+                //     : null;
+                return Card(
+                  color: Colors.black12,
+                  child: Stack(
+                    children: [
+                      // const SizedBox(
+                      //   height: 140,
+                      // ),
+                      // videoTrack != null
+                      //     ? VideoTrackRenderer(
+                      //         videoTrack as VideoTrack,
+                      //         fit: RTCVideoViewObjectFit
+                      //             .RTCVideoViewObjectFitCover,
+                      //       )
+                      //     : const NoVideoWidget(),
+                      _buildVideoOrScreenShare(participant),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              participant.name,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: Icon(
+                    liveKitController.isMicEnabled ? Icons.mic : Icons.mic_off),
+                onPressed: liveKitController.toggleMic,
+              ),
+              IconButton(
+                icon: Icon(liveKitController.isCameraEnabled
+                    ? Icons.videocam
+                    : Icons.videocam_off),
+                onPressed: liveKitController.toggleCamera,
+              ),
+              IconButton(
+                icon: const Icon(Icons.screen_share),
+                onPressed: liveKitController.isScreenSharing
+                    ? liveKitController.stopScreenShare
+                    : liveKitController.startScreenShare,
+              ),
+              IconButton(
+                icon: const Icon(Icons.call_end_outlined),
+                onPressed: () async {
+                  liveKitController.disconnect();
+                  context.pop();
+                },
+                color: Colors.red,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoOrScreenShare(
+    Participant participant,
+  ) {
+    // Retrieve camera track
+    final cameraTrackPublication =
+        participant.videoTrackPublications.firstWhere(
+      (pub) => pub.source == TrackSource.camera,
+    );
+    final cameraTrack =
+        cameraTrackPublication.track!.isActive && !cameraTrackPublication.muted
+            ? cameraTrackPublication.track
+            : null;
+
+    // Retrieve screen share track
+    final screenShareTrackPublication = participant.videoTrackPublications
+            .where((pub) => pub.source == TrackSource.screenShareVideo)
+            .isNotEmpty
+        ? participant.videoTrackPublications.firstWhere(
+            (pub) => pub.source == TrackSource.screenShareVideo,
+          )
+        : null;
+
+    final screenShareTrack = screenShareTrackPublication != null &&
+            !screenShareTrackPublication.muted
+        ? screenShareTrackPublication.track
+        : null;
+
+    // Priority: Screen share > Camera
+    final activeTrack = cameraTrack;
+    // final activeTrack = screenShareTrack ?? cameraTrack;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() {
+        teachers.insert(0, participant);
+        this.screenShareTrack = screenShareTrack;
+      });
+    });
+    return activeTrack != null
+        ? VideoTrackRenderer(
+            activeTrack as VideoTrack,
+            fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+          )
+        : const NoVideoWidget();
   }
 }
