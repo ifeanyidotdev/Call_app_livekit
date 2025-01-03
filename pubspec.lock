@@ -196,10 +196,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_webrtc
-      sha256: "3efe9828f19a07d29a51a726759ad0c70a840d231548a1c7d0332075a94db1df"
+      sha256: e82ffd0d0b79621c5554eed73509d7f5bd286d57fef29a573846785c65237fb1
       url: "https://pub.dev"
     source: hosted
-    version: "0.12.5+hotfix.1"
+    version: "0.12.5+hotfix.2"
   go_router:
     dependency: "direct main"
     description:
@@ -268,10 +268,10 @@ packages:
     dependency: "direct main"
     description:
       name: livekit_client
-      sha256: "7cdeb3eaeec7fb70a4cf88d9caabccbef9e3bd5f0b23c086320bc5c9acb2770b"
+      sha256: a19bcf8640b45e0730b1e3e3e78be7882dad680c6ebe8ae75294fd8d4612450d
       url: "https://pub.dev"
     source: hosted
-    version: "2.3.4"
+    version: "2.3.4+hotfix.2"
   logging:
     dependency: transitive
     description:

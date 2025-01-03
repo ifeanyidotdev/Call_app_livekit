@@ -35,14 +35,13 @@ class _CallScreenState extends State<CallScreen> {
   List<Participant> participants = [];
   List<Participant> teachers = [];
   Track? screenShareTrack;
+  bool isScreenSharing = false;
 
   @override
   void initState() {
-    // _initialize();
     super.initState();
     widget.room.addListener(_onRoomDidUpdate);
     _setUpListeners();
-    // _initializeRenderer();
   }
 
   void _sortParticipants() {
@@ -103,17 +102,17 @@ class _CallScreenState extends State<CallScreen> {
     ..on<RoomDisconnectedEvent>((event) async {
       if (event.reason != null) {
         print('Room disconnected: reason => ${event.reason}');
-        // WidgetsBindingCompatible.instance?.addPostFrameCallback((timeStamp) =>
-        //     Navigator.popUntil(context, (route) => route.isFirst));
       }
-      WidgetsBindingCompatible.instance
-          ?.addPostFrameCallback((timeStamp) => context.pop());
+      WidgetsBindingCompatible.instance?.addPostFrameCallback(
+          (timeStamp) => Navigator.popUntil(context, (route) => route.isFirst));
+      // WidgetsBindingCompatible.instance
+      //     ?.addPostFrameCallback((timeStamp) => context.pop());
     })
     ..on<ParticipantEvent>((event) {
-      print('Participant event');
+      print('Participant event ${event.toString()}');
       // sort participants on many track events as noted in documentation linked above
-      // _sortParticipants();
-      _onRoomDidUpdate();
+      _sortParticipants();
+      // _onRoomDidUpdate();
     })
     ..on<RoomRecordingStatusChanged>((event) {
       // context.showRecordingStatusChangedDialog(event.activeRecording);
@@ -130,6 +129,11 @@ class _CallScreenState extends State<CallScreen> {
     ..on<LocalTrackUnpublishedEvent>((_) => _sortParticipants())
     ..on<TrackSubscribedEvent>((_) => _sortParticipants())
     ..on<TrackUnsubscribedEvent>((_) => _sortParticipants())
+    ..on<TrackPublishedEvent>((event) {
+      print("TRACK PUBLISHED: ${event.participant.identity}");
+      _sortParticipants();
+    })
+    ..on<TrackUnpublishedEvent>((_) => _sortParticipants())
     // ..on<TrackE2EEStateEvent>()
     ..on<ParticipantNameUpdatedEvent>((event) {
       print(
@@ -143,12 +147,12 @@ class _CallScreenState extends State<CallScreen> {
       print('Room metadata changed: ${event.metadata}');
     })
     ..on<DataReceivedEvent>((event) {
-      String decoded = 'Failed to decode';
-      try {
-        decoded = utf8.decode(event.data);
-      } catch (err) {
-        print('Failed to decode: $err');
-      }
+      // String decoded = 'Failed to decode';
+      // try {
+      //   decoded = utf8.decode(event.data);
+      // } catch (err) {
+      //   print('Failed to decode: $err');
+      // }
       // context.showDataReceivedDialog(decoded);
     });
 
@@ -164,9 +168,9 @@ class _CallScreenState extends State<CallScreen> {
 
   void _onRoomDidUpdate() {
     _sortParticipants();
-    if (mounted) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {});
-    }
+    });
   }
 
   @override
@@ -180,7 +184,7 @@ class _CallScreenState extends State<CallScreen> {
       ),
       body: Column(
         children: [
-          if (liveKitController.isScreenSharing) ...[
+          if (isScreenSharing) ...[
             Expanded(
               flex: 7,
               child: Card(
@@ -190,18 +194,15 @@ class _CallScreenState extends State<CallScreen> {
                     const SizedBox(
                       height: 140,
                     ),
-                    Expanded(
-                      child: screenShareTrack != null
-                          ? screenShareTrack?.muted == true
-                              ? const NoVideoWidget()
-                              : VideoTrackRenderer(
-                                  teachers.first.videoTrackPublications.first
-                                      .track as VideoTrack,
-                                  fit: RTCVideoViewObjectFit
-                                      .RTCVideoViewObjectFitCover,
-                                )
-                          : const NoVideoWidget(),
-                    ),
+                    screenShareTrack != null
+                        ? screenShareTrack?.muted == true
+                            ? const NoVideoWidget()
+                            : VideoTrackRenderer(
+                                screenShareTrack as VideoTrack,
+                                fit: RTCVideoViewObjectFit
+                                    .RTCVideoViewObjectFitCover,
+                              )
+                        : const NoVideoWidget(),
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Row(
@@ -220,11 +221,14 @@ class _CallScreenState extends State<CallScreen> {
             ),
           ],
           Expanded(
-            flex: 3,
+            flex: 2,
             child: GridView.builder(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount:
-                    participants.length == 2 ? 1 : 2, // Adjust for larger grids
+                crossAxisCount: participants.length == 2
+                    ? isScreenSharing
+                        ? 2
+                        : 1
+                    : 2, // Adjust for larger grids
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 5,
               ),
@@ -309,12 +313,20 @@ class _CallScreenState extends State<CallScreen> {
     Participant participant,
   ) {
     // Retrieve camera track
-    final cameraTrackPublication =
-        participant.videoTrackPublications.firstWhere(
-      (pub) => pub.source == TrackSource.camera,
-    );
+    // final cameraTrackPublication =
+    //     participant.videoTrackPublications.firstWhere(
+    //   (pub) => pub.source == TrackSource.camera,
+    // );
+    final cameraTrackPublication = participant.videoTrackPublications
+            .where((pub) => pub.source == TrackSource.camera)
+            .isNotEmpty
+        ? participant.videoTrackPublications.firstWhere(
+            (pub) => pub.source == TrackSource.camera,
+          )
+        : null;
+
     final cameraTrack =
-        cameraTrackPublication.track!.isActive && !cameraTrackPublication.muted
+        cameraTrackPublication != null && !cameraTrackPublication.muted
             ? cameraTrackPublication.track
             : null;
 
@@ -339,12 +351,17 @@ class _CallScreenState extends State<CallScreen> {
       setState(() {
         teachers.insert(0, participant);
         this.screenShareTrack = screenShareTrack;
+        isScreenSharing = screenShareTrack != null ? true : false;
       });
     });
+
+    (() async {});
+
     return activeTrack != null
         ? VideoTrackRenderer(
             activeTrack as VideoTrack,
             fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+            // renderMode: VideoRenderMode.platformView,
           )
         : const NoVideoWidget();
   }

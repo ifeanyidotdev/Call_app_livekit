@@ -57,7 +57,7 @@ class LiveKitController extends ChangeNotifier {
   Room get room => _room;
   EventsListener<RoomEvent> get listener => _listener;
 
-  Future<String> getConnectionToken(
+  Future<String?> getConnectionToken(
       {required String username,
       required String meetId,
       required String userId}) async {
@@ -77,8 +77,10 @@ class LiveKitController extends ChangeNotifier {
     } catch (e) {
       print("TOKEN ERROR: $e");
       _isJoining = false;
+      _isError = true;
+      _errorMessage = e.toString();
       notifyListeners();
-      return "";
+      return null;
     }
   }
 
@@ -274,8 +276,14 @@ class LiveKitController extends ChangeNotifier {
           return;
         }
         await requestBackgroundPermission();
-        _isScreenSharing = true;
+        // final screenShareTrack = await LocalVideoTrack.createScreenShareTrack(
+        //     const ScreenShareCaptureOptions(
+        //         useiOSBroadcastExtension: true, captureScreenAudio: false));
         await _room.localParticipant!.setScreenShareEnabled(true);
+        // await _room.localParticipant?.publishVideoTrack(
+        //   screenShareTrack,
+        // );
+        _isScreenSharing = true;
         notifyListeners();
       } catch (e) {
         print('Error starting screen share: $e');

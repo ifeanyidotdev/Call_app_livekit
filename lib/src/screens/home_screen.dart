@@ -63,11 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 backgroundColor: WidgetStateProperty.all(Colors.blue),
               ),
               onPressed: () async {
-                String token = await liveKitController.getConnectionToken(
-                    username: _usernameController.text,
-                    meetId: _callIdController.text,
-                    userId: _peerIdController.text);
-                await liveKitController.connectToRoom(token);
+                String? token = await liveKitController.getConnectionToken(
+                  username: _usernameController.text,
+                  meetId: _callIdController.text,
+                  userId: _peerIdController.text,
+                );
+                await liveKitController.connectToRoom(token ?? "");
                 if (liveKitController.isConnected) {
                   context.push(CallScreen.routeName, extra: {
                     "callId": _callIdController.text,
